@@ -1,6 +1,6 @@
 (function () {
-    if (window.__KarotterFixV24Installed) return;
-    window.__KarotterFixV24Installed = true;
+    if (window.__KarotterFixV30Installed) return;
+    window.__KarotterFixV30Installed = true;
 
     let scrollBtnContainer = null;
     let hasBoundKeyboard = false;
@@ -36,21 +36,14 @@
             const dmArea = candidates
                 .filter((el) => {
                     const r = el.getBoundingClientRect();
-
                     if (r.width < 200 || r.height < 200) return false;
                     if (r.left < 350) return false;
                     if (el.scrollHeight <= el.clientHeight) return false;
-
                     return true;
                 })
-                .sort((a, b) => {
-                    return b.getBoundingClientRect().left - a.getBoundingClientRect().left;
-                })[0];
+                .sort((a, b) => b.getBoundingClientRect().left - a.getBoundingClientRect().left)[0];
 
-            if (dmArea) {
-                console.log('[scroll target] DM area found', dmArea);
-                return dmArea;
-            }
+            if (dmArea) return dmArea;
         }
 
         const main = document.querySelector('div.overflow-x-hidden.overflow-y-auto');
@@ -60,11 +53,7 @@
     }
 
     function scrollToTarget(target, top, duration = SCROLL_DURATION) {
-        const el =
-            !target || target === window
-                ? (document.scrollingElement || document.documentElement)
-                : target;
-
+        const el = !target || target === window ? document.scrollingElement || document.documentElement : target;
         const start = el.scrollTop;
         const change = top - start;
 
@@ -78,8 +67,6 @@
         function animate(now) {
             const elapsed = now - startTime;
             const progress = Math.min(elapsed / duration, 1);
-
-            // かなり短い時間でも「少し動いた感」が出る easing
             const eased = 1 - Math.pow(1 - progress, 3);
 
             el.scrollTop = start + change * eased;
@@ -107,17 +94,13 @@
             'keydown',
             (e) => {
                 const tag = document.activeElement?.tagName;
-                const editing =
-                    tag === 'INPUT' ||
-                    tag === 'TEXTAREA' ||
-                    document.activeElement?.isContentEditable;
+                const editing = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable;
 
                 if (editing) return;
 
                 if (e.shiftKey && e.key === 'ArrowUp') {
                     e.preventDefault();
-                    const t = getScrollTarget();
-                    scrollToTarget(t, 0);
+                    scrollToTarget(getScrollTarget(), 0);
                 }
 
                 if (e.shiftKey && e.key === 'ArrowDown') {
@@ -133,7 +116,6 @@
 
     function applySavedPosition() {
         if (!scrollBtnContainer) return;
-
         const pos = loadPosition();
         if (!pos) return;
 
@@ -141,6 +123,65 @@
         scrollBtnContainer.style.top = `${pos.top}px`;
         scrollBtnContainer.style.right = 'auto';
         scrollBtnContainer.style.bottom = 'auto';
+    }
+
+    function fixMentionPopupPosition() {
+        const textarea =
+            document.activeElement?.tagName === 'TEXTAREA' ? document.activeElement : (
+            document.querySelector('textarea#post-detail-reply-input') ||
+            document.querySelector('textarea.karotter-composer-textarea') ||
+            document.querySelector('textarea'));
+
+        if (!textarea) return;
+
+        const popups = [...document.querySelectorAll('div.absolute.z-\\[150\\].overflow-auto')].filter(
+            (popup) => {
+                const r = popup.getBoundingClientRect();
+                return r.width >= 180 && r.width <= 520 && r.height >= 80 && r.height <= 420;
+            }
+        );
+
+        if (popups.length === 0) return;
+
+        const textValue = textarea.value;
+        const selectionStart = textarea.selectionStart || 0;
+        const textBeforeCaret = textValue.substring(0, selectionStart);
+        const lines = textBeforeCaret.split('\n');
+        const currentLineIndex = lines.length - 1;
+        const currentLineText = lines[currentLineIndex];
+
+        const charWidth = 7.8;
+        const lineHeight = 26;
+        const rect = textarea.getBoundingClientRect();
+
+        const baseLeft = rect.left + 16;
+        const baseTop = rect.top + 12;
+
+        const caretOffsetLeft = Math.min(currentLineText.length * charWidth, rect.width - 40);
+        const caretOffsetTop = currentLineIndex * lineHeight;
+
+        let left = baseLeft + caretOffsetLeft;
+        let top = baseTop + caretOffsetTop + lineHeight + window.pageYOffset + 12;
+
+        const popupWidth = 320;
+        const popupHeight = 240;
+        left = Math.min(left, window.innerWidth - popupWidth - 16);
+
+        for (const popup of popups) {
+            if (popup.style.top === `${Math.round(top)}px` && popup.style.left === `${Math.round(left)}px`) {
+                continue;
+            }
+
+            popup.style.setProperty('position', 'absolute', 'important');
+            popup.style.setProperty('top', `${Math.round(top)}px`, 'important');
+            popup.style.setProperty('left', `${Math.round(left)}px`, 'important');
+            popup.style.setProperty('width', `${popupWidth}px`, 'important');
+            popup.style.setProperty('max-height', `${popupHeight}px`, 'important');
+            popup.style.setProperty('overflow-y', 'auto', 'important');
+            popup.style.setProperty('z-index', '999999', 'important');
+            popup.style.setProperty('margin', '0', 'important');
+            popup.style.setProperty('transform', 'none', 'important');
+        }
     }
 
     function createScrollBtns() {
@@ -159,9 +200,7 @@
             user-select: none;
             opacity: 0.45;
             transform: translateZ(0);
-            transition:
-                opacity 0.18s ease,
-                transform 0.18s ease;
+            transition: opacity 0.18s ease, transform 0.18s ease;
         `;
 
         const btnStyle = `
@@ -169,12 +208,7 @@
             height: 48px;
             border-radius: 16px;
             border: 1px solid rgba(255,255,255,0.08);
-            background:
-                linear-gradient(
-                    180deg,
-                    rgba(80,80,90,0.72),
-                    rgba(40,40,50,0.72)
-                );
+            background: linear-gradient(180deg, rgba(80,80,90,0.72), rgba(40,40,50,0.72));
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
             color: rgba(255,255,255,0.92);
@@ -184,14 +218,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow:
-                0 6px 18px rgba(0,0,0,0.28),
-                inset 0 1px 0 rgba(255,255,255,0.08);
-            transition:
-                transform 0.15s ease,
-                background 0.15s ease,
-                box-shadow 0.15s ease,
-                opacity 0.15s ease;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08);
+            transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
         `;
 
         const topBtn = document.createElement('button');
@@ -204,14 +232,9 @@
         };
         topBtn.onmouseleave = () => {
             topBtn.style.transform = 'translateY(0)';
-            topBtn.style.boxShadow =
-                '0 6px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)';
+            topBtn.style.boxShadow = '0 6px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)';
         };
-        topBtn.onclick = () => {
-            const t = getScrollTarget();
-            console.log('[scroll up] target:', t?.className ?? 'window');
-            scrollToTarget(t, 0);
-        };
+        topBtn.onclick = () => scrollToTarget(getScrollTarget(), 0);
 
         const botBtn = document.createElement('button');
         botBtn.innerHTML = '↓';
@@ -223,14 +246,11 @@
         };
         botBtn.onmouseleave = () => {
             botBtn.style.transform = 'translateY(0)';
-            botBtn.style.boxShadow =
-                '0 6px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)';
+            botBtn.style.boxShadow = '0 6px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)';
         };
         botBtn.onclick = () => {
             const t = getScrollTarget();
-            console.log('[scroll down] target:', t?.className ?? 'window');
-            const height = t?.scrollHeight ?? document.body.scrollHeight;
-            scrollToTarget(t, height);
+            scrollToTarget(t, t?.scrollHeight ?? document.body.scrollHeight);
         };
 
         scrollBtnContainer.appendChild(topBtn);
@@ -251,7 +271,6 @@
 
         scrollBtnContainer.addEventListener('pointerdown', (e) => {
             if (e.target.tagName === 'BUTTON') return;
-
             isDragging = true;
 
             const rect = scrollBtnContainer.getBoundingClientRect();
@@ -260,19 +279,14 @@
 
             scrollBtnContainer.style.opacity = '1';
             scrollBtnContainer.style.transition = 'none';
-
             scrollBtnContainer.setPointerCapture?.(e.pointerId);
             e.preventDefault();
         });
 
         scrollBtnContainer.addEventListener('pointermove', (e) => {
             if (!isDragging) return;
-
-            const left = e.clientX - dragOffsetX;
-            const top = e.clientY - dragOffsetY;
-
-            scrollBtnContainer.style.left = `${left}px`;
-            scrollBtnContainer.style.top = `${top}px`;
+            scrollBtnContainer.style.left = `${e.clientX - dragOffsetX}px`;
+            scrollBtnContainer.style.top = `${e.clientY - dragOffsetY}px`;
             scrollBtnContainer.style.right = 'auto';
             scrollBtnContainer.style.bottom = 'auto';
         });
@@ -280,10 +294,7 @@
         const endDrag = () => {
             if (!isDragging) return;
             isDragging = false;
-
-            scrollBtnContainer.style.transition =
-                'opacity 0.18s ease, transform 0.18s ease';
-
+            scrollBtnContainer.style.transition = 'opacity 0.18s ease, transform 0.18s ease';
             const rect = scrollBtnContainer.getBoundingClientRect();
             savePosition(Math.round(rect.left), Math.round(rect.top));
         };
@@ -308,6 +319,14 @@
     }
 
     const applyAll = () => {
+        const mentionOpen = document.querySelector('div.absolute.z-\\[150\\].overflow-auto');
+
+        if (mentionOpen) {
+            fixMentionPopupPosition();
+            updateScrollBtns();
+            return;
+        }
+
         const tl = document.querySelector('.timeline-main-column');
         if (tl) {
             tl.style.setProperty('max-width', 'none', 'important');
@@ -326,12 +345,10 @@
             cur = cur.parentElement;
         }
 
-        document
-            .querySelectorAll('.max-w-2xl, .max-w-\\[550px\\], .max-w-\\[36rem\\]')
-            .forEach((el) => {
-                el.style.setProperty('max-width', 'none', 'important');
-                el.style.setProperty('width', '100%', 'important');
-            });
+        document.querySelectorAll('.max-w-2xl, .max-w-\\[550px\\], .max-w-\\[36rem\\]').forEach((el) => {
+            el.style.setProperty('max-width', 'none', 'important');
+            el.style.setProperty('width', '100%', 'important');
+        });
 
         document.querySelectorAll('.timeline-main-column p').forEach((el) => {
             el.style.setProperty('max-inline-size', 'none', 'important');
@@ -352,7 +369,11 @@
 
         document.querySelectorAll('.fixed.inset-0').forEach((overlay) => {
             const modal = overlay.querySelector('.bg-white, .bg-\\[var\\(--surface\\)\\]');
-            if (!modal || !modal.querySelector('form')) return;
+            if (!modal) return;
+
+            const form = modal.querySelector('form');
+            const textarea = modal.querySelector('textarea');
+            if (!form || !textarea) return;
 
             const vw = window.innerWidth;
             const vh = window.innerHeight;
@@ -388,60 +409,56 @@
                 }
             }
 
-            const form = modal.querySelector('form');
-            if (form) {
-                form.style.setProperty('flex', '1 1 0', 'important');
-                form.style.setProperty('display', 'flex', 'important');
-                form.style.setProperty('flex-direction', 'column', 'important');
-                form.style.setProperty('overflow', 'hidden', 'important');
-                form.style.setProperty('min-height', '0', 'important');
+            form.style.setProperty('flex', '1 1 0', 'important');
+            form.style.setProperty('display', 'flex', 'important');
+            form.style.setProperty('flex-direction', 'column', 'important');
+            form.style.setProperty('overflow', 'hidden', 'important');
+            form.style.setProperty('min-height', '0', 'important');
 
-                const spaceX3 = form.querySelector('.flex.space-x-3');
-                if (spaceX3) {
-                    spaceX3.style.setProperty('flex', '1 1 0', 'important');
-                    spaceX3.style.setProperty('display', 'flex', 'important');
-                    spaceX3.style.setProperty('min-height', '0', 'important');
-                    spaceX3.style.setProperty('overflow', 'hidden', 'important');
+            const spaceX3 = form.querySelector('.flex.space-x-3');
+            if (spaceX3) {
+                spaceX3.style.setProperty('flex', '1 1 0', 'important');
+                spaceX3.style.setProperty('display', 'flex', 'important');
+                spaceX3.style.setProperty('min-height', '0', 'important');
+                spaceX3.style.setProperty('overflow', 'hidden', 'important');
 
-                    const inner = spaceX3.querySelector('.flex-1');
-                    if (inner) {
-                        inner.style.setProperty('display', 'flex', 'important');
-                        inner.style.setProperty('flex-direction', 'column', 'important');
-                        inner.style.setProperty('min-height', '0', 'important');
-                        inner.style.setProperty('overflow', 'hidden', 'important');
+                const inner = spaceX3.querySelector('.flex-1');
+                if (inner) {
+                    inner.style.setProperty('display', 'flex', 'important');
+                    inner.style.setProperty('flex-direction', 'column', 'important');
+                    inner.style.setProperty('min-height', '0', 'important');
+                    inner.style.setProperty('overflow', 'hidden', 'important');
 
-                        const composerWrap = inner.querySelector('.relative.w-full');
-                        if (composerWrap) {
-                            composerWrap.style.setProperty('flex', '1 1 0', 'important');
-                            composerWrap.style.setProperty('min-height', '0', 'important');
-                            composerWrap.style.setProperty('display', 'flex', 'important');
-                            composerWrap.style.setProperty('flex-direction', 'column', 'important');
-                        }
+                    const composerWrap = inner.querySelector('.relative.w-full');
+                    if (composerWrap) {
+                        composerWrap.style.setProperty('flex', '1 1 0', 'important');
+                        composerWrap.style.setProperty('min-height', '0', 'important');
+                        composerWrap.style.setProperty('display', 'flex', 'important');
+                        composerWrap.style.setProperty('flex-direction', 'column', 'important');
+                    }
 
-                        const textarea = inner.querySelector('textarea');
-                        if (textarea) {
-                            textarea.style.setProperty('flex', '1 1 0', 'important');
-                            textarea.style.setProperty('height', '100%', 'important');
-                            textarea.style.setProperty('min-height', '180px', 'important');
-                            textarea.style.setProperty('resize', 'none', 'important');
-                        }
+                    const composerTextarea = inner.querySelector('textarea');
+                    if (composerTextarea) {
+                        composerTextarea.style.setProperty('flex', '1 1 0', 'important');
+                        composerTextarea.style.setProperty('min-height', '180px', 'important');
+                        composerTextarea.style.setProperty('resize', 'none', 'important');
+                    }
 
-                        const composerOverlay = inner.querySelector('.karotter-composer-overlay');
-                        if (composerOverlay) {
-                            composerOverlay.style.setProperty('flex', '1 1 0', 'important');
-                            composerOverlay.style.setProperty('min-height', '180px', 'important');
-                        }
+                    const composerOverlay = inner.querySelector('.karotter-composer-overlay');
+                    if (composerOverlay) {
+                        composerOverlay.style.setProperty('flex', '1 1 0', 'important');
+                        composerOverlay.style.setProperty('min-height', '180px', 'important');
                     }
                 }
+            }
 
-                const toolbarBottom = form.querySelector('.mt-4.flex.flex-col');
-                if (toolbarBottom) {
-                    toolbarBottom.style.setProperty('flex-shrink', '0', 'important');
-                }
+            const toolbarBottom = form.querySelector('.mt-4.flex.flex-col');
+            if (toolbarBottom) {
+                toolbarBottom.style.setProperty('flex-shrink', '0', 'important');
             }
         });
 
-        document.querySelectorAll('.flex.flex-wrap.items-center.justify-between').forEach((toolbar) => {
+        document.querySelectorAll('.timeline-main-column .flex.flex-wrap.items-center.justify-between').forEach((toolbar) => {
             toolbar.style.setProperty('justify-content', 'flex-start', 'important');
             toolbar.style.setProperty('gap', '8px', 'important');
 
@@ -460,11 +477,9 @@
             }
         });
 
-        document
-            .querySelectorAll('.timeline-main-column form .flex.w-full.items-center.justify-between')
-            .forEach((el) => {
-                el.style.setProperty('justify-content', 'flex-end', 'important');
-            });
+        document.querySelectorAll('.timeline-main-column form .flex.w-full.items-center.justify-between').forEach((el) => {
+            el.style.setProperty('justify-content', 'flex-end', 'important');
+        });
 
         document.querySelectorAll('*').forEach((el) => {
             if (el.childElementCount === 0 && el.textContent.trim() === 'まだ返信がありません') {
@@ -478,6 +493,7 @@
             }
         });
 
+        fixMentionPopupPosition();
         updateScrollBtns();
     };
 
@@ -492,6 +508,4 @@
         }
         applyAll();
     }).observe(document.body, { childList: true, subtree: true });
-
-    console.log('[KarotterFix] v24 起動');
 })();
