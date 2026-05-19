@@ -319,6 +319,15 @@
     }
 
     const applyAll = () => {
+        // 【パッチ：掲示板一覧(/boards) の幅制限をピンポイント解除】
+        if (location.pathname.includes('/boards')) {
+            const boardMain = document.querySelector('main.mx-auto');
+            if (boardMain) {
+                boardMain.style.setProperty('max-width', '100%', 'important');
+                boardMain.style.setProperty('width', '100%', 'important');
+            }
+        }
+
         const mentionOpen = document.querySelector('div.absolute.z-\\[150\\].overflow-auto');
 
         if (mentionOpen) {
@@ -327,30 +336,34 @@
             return;
         }
 
-        const tl = document.querySelector('.timeline-main-column');
-        if (tl) {
-            tl.style.setProperty('max-width', 'none', 'important');
-            tl.style.setProperty('width', '100%', 'important');
-            tl.style.setProperty('flex', '1 1 auto', 'important');
-            tl.style.setProperty('min-width', '0', 'important');
-        }
-
-        let cur = tl?.parentElement;
-        while (cur && cur !== document.body) {
-            const mw = parseFloat(getComputedStyle(cur).maxWidth);
-            if (!isNaN(mw) && mw < window.innerWidth * 0.85) {
-                cur.style.setProperty('max-width', 'none', 'important');
-                cur.style.setProperty('width', '100%', 'important');
+        const mainColumns = document.querySelectorAll('.timeline-main-column, [class*="main-column"], .flex-1.min-w-0');
+        mainColumns.forEach((tl) => {
+            if (tl.offsetWidth > 200 || tl.className.includes('column')) {
+                tl.style.setProperty('max-width', 'none', 'important');
+                tl.style.setProperty('width', '100%', 'important');
+                tl.style.setProperty('flex', '1 1 auto', 'important');
+                tl.style.setProperty('min-width', '0', 'important');
             }
-            cur = cur.parentElement;
-        }
+        });
 
-        document.querySelectorAll('.max-w-2xl, .max-w-\\[550px\\], .max-w-\\[36rem\\]').forEach((el) => {
+        mainColumns.forEach((tl) => {
+            let cur = tl?.parentElement;
+            while (cur && cur !== document.body) {
+                const mw = parseFloat(getComputedStyle(cur).maxWidth);
+                if (!isNaN(mw) && mw < window.innerWidth * 0.85) {
+                    cur.style.setProperty('max-width', 'none', 'important');
+                    cur.style.setProperty('width', '100%', 'important');
+                }
+                cur = cur.parentElement;
+            }
+        });
+
+        document.querySelectorAll('.max-w-2xl, .max-w-\\[550px\\], .max-w-\\[36rem\\], .max-w-xl').forEach((el) => {
             el.style.setProperty('max-width', 'none', 'important');
             el.style.setProperty('width', '100%', 'important');
         });
 
-        document.querySelectorAll('.timeline-main-column p').forEach((el) => {
+        document.querySelectorAll('.timeline-main-column p, [class*="main-column"] p').forEach((el) => {
             el.style.setProperty('max-inline-size', 'none', 'important');
             el.style.setProperty('overflow-wrap', 'break-word', 'important');
             el.style.setProperty('word-break', 'normal', 'important');
@@ -361,10 +374,6 @@
                 el.style.setProperty('max-width', 'none', 'important');
                 el.style.setProperty('width', '100%', 'important');
             }
-        });
-
-        document.querySelectorAll('.dm-groups-page .max-w-xl').forEach((el) => {
-            el.style.setProperty('max-width', 'none', 'important');
         });
 
         document.querySelectorAll('.fixed.inset-0').forEach((overlay) => {
