@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Karotter UI Fix",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Karotterのタイムラインの幅やUIを調整する拡張機能です。",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Karotter UI Fix 設定"
+  },
+  "permissions": ["storage"],
   "content_scripts": [
     {
       "matches": [
